@@ -1,0 +1,71 @@
+services:
+  garage:
+    image: dxflrs/garage:v2.1.0
+    volumes:
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+      - ./garage/garage.toml:/etc/garage.toml:ro
+    healthcheck:
+      test: [ "CMD", "/garage", "status" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  garage-webui:
+    image: khairul169/garage-webui:latest
+    container_name: garage-webui
+    restart: unless-stopped
+    volumes:
+      - ./garage/garage.toml:/etc/garage.toml:ro
+    ports:
+      - "127.0.0.1:3909:3909"
+    environment:
+      API_BASE_URL: "http://garage:3903"
+      S3_ENDPOINT_URL: "http://garage:3900"
+
+  garage-init:
+    image: alpine:latest
+    depends_on:
+      garage:
+        condition: service_healthy
+    volumes:
+      - ./garage/init.sh:/init.sh:ro
+    entrypoint: [ "/bin/sh", "-c", "apk add --no-cache curl jq && /bin/sh /init.sh" ]
+    restart: "no"
+
+  registry:
+    image: registry:2
+    ports:
+      - "127.0.0.1:8500:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+
+  registry-ui:
+    image: joxit/docker-registry-ui:latest
+    ports:
+      - "127.0.0.1:8501:80"
+    environment:
+      - REGISTRY_TITLE=Image Manager Registry
+      - NGINX_PROXY_PASS_URL=http://registry:5000
+      - SINGLE_REGISTRY=true
+    depends_on:
+      - registry
+
+  buildkitd:
+    image: moby/buildkit
+    command: [ "--addr","tcp://0.0.0.0:8502" ]
+    ports:
+      - "127.0.0.1:8502:8502"
+    security_opt:
+      - seccomp=unconfined
+      - apparmor=unconfined
+      - systempaths=unconfined
+    privileged: true
+
+volumes:
+  garage-meta:
+  garage-data:
+  registry-data:
