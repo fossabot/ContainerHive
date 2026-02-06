@@ -11,7 +11,7 @@ RUN if [[ "$(arch)" == "x86_64" ]]; then \
 
 FROM chainguard/wolfi-base
 LABEL org.opencontainers.image.title="ContainerHive"
-LABEL org.opencontainers.image.description="Swarm it. Build it. Run it."
+LABEL org.opencontainers.image.description="Swarm it. Build it. Run it. — Managing container base and library images has never been easier."
 LABEL org.opencontainers.image.ref.name="main"
 LABEL org.opencontainers.image.licenses='GPLv3'
 LABEL org.opencontainers.image.vendor="Timo Reymann <mail@timo-reymann.de>"

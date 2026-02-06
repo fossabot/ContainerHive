@@ -11,7 +11,7 @@ ContainerHive
 <p align="center">
 	<img width="512" src="https://raw.githubusercontent.com/timo-reymann/ContainerHive/refs/heads/main/.github/images/logo.png">
     <br />
-    Swarm it. Build it. Run it.
+    Swarm it. Build it. Run it. — Managing container base and library images has never been easier.
 </p>
 
 ## Features
