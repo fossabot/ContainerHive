@@ -48,4 +48,4 @@ create-checksums: ## Create checksums for binaries
 
 build-image: build-image-container-hive ## Build all images
 
-build: create-dist build-linux build-darwin create-checksums ## Build binaries for all platform
+build: create-dist build-linux build-darwin ## Build binaries for all platform
