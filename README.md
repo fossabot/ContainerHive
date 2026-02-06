@@ -9,7 +9,7 @@ ContainerHive
 [![pre-commit](https://img.shields.io/badge/%E2%9A%93%20%20pre--commit-enabled-success)](https://pre-commit.com/)
 
 <p align="center">
-	<img width="300" src="./.github/images/logo.png">
+	<img width="512" src="https://raw.githubusercontent.com/timo-reymann/ContainerHive/refs/heads/main/.github/images/logo.png">
     <br />
     Swarm it. Build it. Run it.
 </p>
