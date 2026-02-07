@@ -10,12 +10,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/moby/buildkit/client"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/timo-reymann/ContainerHive/internal/buildkit/build_context"
 	"github.com/timo-reymann/ContainerHive/internal/buildkit/cache"
+	"github.com/timo-reymann/ContainerHive/internal/testutil"
 )
 
 const (
@@ -88,12 +90,14 @@ func TestIntegrationBuild(t *testing.T) {
 	// --- BuildKit ---
 	buildkitC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
-			Image:        "moby/buildkit:latest",
+			Image:        testutil.BuildKitImage(),
 			ExposedPorts: []string{"1234/tcp"},
 			Cmd:          []string{"--addr", "tcp://0.0.0.0:1234"},
-			Privileged:   true,
 			Networks:     []string{net.Name},
 			WaitingFor:   wait.ForListeningPort("1234/tcp"),
+			HostConfigModifier: func(hc *container.HostConfig) {
+				hc.Privileged = true
+			},
 		},
 		Started: true,
 	})
