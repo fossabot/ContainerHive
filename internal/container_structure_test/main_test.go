@@ -142,7 +142,7 @@ fileExistenceTests:
 		reportFile := filepath.Join(t.TempDir(), "junit.xml")
 		runner := TestRunner{
 			TestDefinitionPath: testDefPath,
-			ImageTarPath:       tarFile,
+			Image:              tarFile,
 			Platform:           platform,
 			ReportFile:         reportFile,
 		}
@@ -165,7 +165,7 @@ fileExistenceTests:
 		reportFile := filepath.Join(t.TempDir(), "junit-docker.xml")
 		runner := TestRunner{
 			TestDefinitionPath: testDefPath,
-			ImageTarPath:       "cst-test:latest",
+			Image:              "cst-test:latest",
 			Platform:           platform,
 			ReportFile:         reportFile,
 		}
@@ -200,7 +200,7 @@ fileExistenceTests:
 		reportFile := filepath.Join(t.TempDir(), "junit-fail.xml")
 		runner := TestRunner{
 			TestDefinitionPath: failDefPath,
-			ImageTarPath:       tarFile,
+			Image:              tarFile,
 			Platform:           platform,
 			ReportFile:         reportFile,
 		}

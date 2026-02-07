@@ -16,14 +16,14 @@ import (
 
 type TestRunner struct {
 	TestDefinitionPath string
-	ImageTarPath       string
+	Image              string
 	Platform           string
 	ReportFile         string
 }
 
 func (t *TestRunner) getOptions(output unversioned.OutputValue) *config.StructureTestOptions {
 	return &config.StructureTestOptions{
-		ImagePath:           t.ImageTarPath,
+		ImagePath:           t.Image,
 		IgnoreRefAnnotation: false,
 		ConfigFiles:         []string{t.TestDefinitionPath},
 		Platform:            t.Platform,
@@ -36,7 +36,7 @@ func (t *TestRunner) getOptions(output unversioned.OutputValue) *config.Structur
 }
 
 func (t *TestRunner) isTar() bool {
-	return filepath.Ext(t.ImageTarPath) == ".tar"
+	return filepath.Ext(t.Image) == ".tar"
 }
 
 func (t *TestRunner) loadImageFromTar(ctx context.Context) (string, error) {
@@ -46,7 +46,7 @@ func (t *TestRunner) loadImageFromTar(ctx context.Context) (string, error) {
 	}
 	defer c.Close()
 
-	imgFile, err := os.Open(t.ImageTarPath)
+	imgFile, err := os.Open(t.Image)
 	if err != nil {
 		return "", err
 	}
@@ -58,14 +58,14 @@ func (t *TestRunner) loadImageFromTar(ctx context.Context) (string, error) {
 	}
 	defer res.Body.Close()
 
-	return imageNameFromTar(t.ImageTarPath)
+	return imageNameFromTar(t.Image)
 }
 
 func (t *TestRunner) resolveImageName(ctx context.Context) (string, error) {
 	if t.isTar() {
 		return t.loadImageFromTar(ctx)
 	}
-	return t.ImageTarPath, nil
+	return t.Image, nil
 }
 
 func (t *TestRunner) runTests(channel chan interface{}, imageName string, opts *config.StructureTestOptions) {
