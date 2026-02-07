@@ -18,11 +18,13 @@ ContainerHive
 
 <!-- List features as bullet points -->
 
-- Supports buildkit
-- Manage a set of images and their variants via YAML
-- Reproducible layer creation
-- SBOM support out of the box
-- Built-in testing support
+- **Next-gen builds**: Powered by BuildKit, the modern container image builder behind Docker.
+- **Multi-platform ready**: Build and push images for any architecture in a single workflow.
+- **YAML-driven management**: Define and maintain image sets and variants declaratively.
+- **Reproducible layers**: Guarantee consistent, bit-for-bit identical builds every time (given the same inputs)
+- **Testing built in**: Validate images as part of the build process, no extra tooling needed.
+- **Smart caching**: Optimized caching that works out of the box, no manual tuning required.
+- **Enterprise-ready**: Built for scale, compliance, and integration with enterprise workflows (SBOMs, multi-platform, structured governance).
 
 ## Requirements
 
