@@ -1,4 +1,4 @@
-package container_structure_test
+package docker
 
 import (
 	"archive/tar"

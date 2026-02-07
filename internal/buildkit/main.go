@@ -39,6 +39,14 @@ func (c *Client) Close() error {
 	return c.buildkit.Close()
 }
 
+func (c *Client) Version(ctx context.Context) (string, error) {
+	info, err := c.buildkit.Info(ctx)
+	if err != nil {
+		return "", err
+	}
+	return info.BuildkitVersion.Version, nil
+}
+
 func (c *Client) Build(ctx context.Context, opts *BuildOpts, statusUpdateHandler func(chan *client.SolveStatus) error) error {
 	var buildCache []client.CacheOptionsEntry
 	if opts.Cache != nil {

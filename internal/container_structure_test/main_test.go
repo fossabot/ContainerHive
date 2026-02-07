@@ -14,6 +14,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/timo-reymann/ContainerHive/internal/buildkit"
 	"github.com/timo-reymann/ContainerHive/internal/buildkit/build_context"
+	"github.com/timo-reymann/ContainerHive/internal/docker"
 	"github.com/timo-reymann/ContainerHive/internal/testutil"
 )
 
@@ -106,6 +107,12 @@ func TestIntegrationContainerStructureTest(t *testing.T) {
 	t.Setenv("DOCKER_HOST", fmt.Sprintf("tcp://%s:%s", dindHost, dindPort.Port()))
 	t.Setenv("DOCKER_TLS_VERIFY", "")
 
+	dockerClient, err := docker.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { dockerClient.Close() })
+
 	// --- Build a test image using BuildKit ---
 	buildCtxDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(buildCtxDir, "Dockerfile"), []byte("FROM alpine:latest\nRUN echo hello > /hello.txt\n"), 0644); err != nil {
@@ -145,6 +152,7 @@ fileExistenceTests:
 			Image:              tarFile,
 			Platform:           platform,
 			ReportFile:         reportFile,
+			DockerClient:       dockerClient,
 		}
 
 		err := runner.Run()
@@ -168,6 +176,7 @@ fileExistenceTests:
 			Image:              "cst-test:latest",
 			Platform:           platform,
 			ReportFile:         reportFile,
+			DockerClient:       dockerClient,
 		}
 
 		err := runner.Run()
@@ -203,6 +212,7 @@ fileExistenceTests:
 			Image:              tarFile,
 			Platform:           platform,
 			ReportFile:         reportFile,
+			DockerClient:       dockerClient,
 		}
 
 		err := runner.Run()

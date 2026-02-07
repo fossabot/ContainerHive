@@ -121,6 +121,17 @@ func TestIntegrationBuild(t *testing.T) {
 	}
 	t.Cleanup(func() { bkClient.Close() })
 
+	t.Run("version", func(t *testing.T) {
+		version, err := bkClient.Version(ctx)
+		if err != nil {
+			t.Fatal("failed to get buildkit version:", err)
+		}
+		if version == "" {
+			t.Fatal("expected non-empty buildkit version")
+		}
+		t.Logf("BuildKit version: %s", version)
+	})
+
 	t.Run("without_cache", func(t *testing.T) {
 		tarFile := filepath.Join(t.TempDir(), "output.tar")
 

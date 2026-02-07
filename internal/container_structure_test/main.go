@@ -2,7 +2,6 @@ package container_structure_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,7 +10,7 @@ import (
 	"github.com/GoogleContainerTools/container-structure-test/pkg/config"
 	"github.com/GoogleContainerTools/container-structure-test/pkg/drivers"
 	"github.com/GoogleContainerTools/container-structure-test/pkg/types/unversioned"
-	docker "github.com/docker/docker/client"
+	"github.com/timo-reymann/ContainerHive/internal/docker"
 )
 
 type TestRunner struct {
@@ -19,6 +18,7 @@ type TestRunner struct {
 	Image              string
 	Platform           string
 	ReportFile         string
+	DockerClient       *docker.Client
 }
 
 func (t *TestRunner) getOptions(output unversioned.OutputValue) *config.StructureTestOptions {
@@ -39,31 +39,9 @@ func (t *TestRunner) isTar() bool {
 	return filepath.Ext(t.Image) == ".tar"
 }
 
-func (t *TestRunner) loadImageFromTar(ctx context.Context) (string, error) {
-	c, err := docker.NewClientWithOpts(docker.FromEnv, docker.WithHostFromEnv())
-	if err != nil {
-		return "", err
-	}
-	defer c.Close()
-
-	imgFile, err := os.Open(t.Image)
-	if err != nil {
-		return "", err
-	}
-	defer imgFile.Close()
-
-	res, err := c.ImageLoad(ctx, imgFile)
-	if err != nil {
-		return "", errors.Join(errors.New("failed to load image"), err)
-	}
-	defer res.Body.Close()
-
-	return imageNameFromTar(t.Image)
-}
-
 func (t *TestRunner) resolveImageName(ctx context.Context) (string, error) {
 	if t.isTar() {
-		return t.loadImageFromTar(ctx)
+		return t.DockerClient.LoadImageFromTar(ctx, t.Image)
 	}
 	return t.Image, nil
 }
