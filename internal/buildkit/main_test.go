@@ -247,6 +247,7 @@ func TestIntegrationBuild(t *testing.T) {
 
 		registryCache := &cache.RegistryCache{
 			CacheRef: "registry:5000/buildkit-cache",
+			Insecure: true,
 		}
 
 		// First build — populates the cache

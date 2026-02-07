@@ -2,6 +2,7 @@ package cache
 
 type RegistryCache struct {
 	CacheRef string
+	Insecure bool
 }
 
 func (r RegistryCache) Name() string {
@@ -9,10 +10,14 @@ func (r RegistryCache) Name() string {
 }
 
 func (r RegistryCache) ToAttributes() map[string]string {
-	return map[string]string{
+	attrs := map[string]string{
 		"mode":           "max",
 		"ref":            r.CacheRef,
 		"image-manifest": "true",
 		"oci-mediatypes": "true",
 	}
+	if r.Insecure {
+		attrs["registry.insecure"] = "true"
+	}
+	return attrs
 }
