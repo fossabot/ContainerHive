@@ -22,6 +22,9 @@ executors:
   python:
     docker:
       - image: cimg/python:3.13
+  node:
+    docker:
+      - image: cimg/python:3.13-node
 
 jobs:
   test:
@@ -86,6 +89,41 @@ jobs:
           image: timoreymann/container-hive
           docker-username: DOCKER_USERNAME
           docker-password: DOCKER_TOKEN
+  build-gh-pages:
+    executor: node
+    environment:
+      PIP_CACHE_DIR: /tmp/pip-cache
+    steps:
+      - checkout
+      - restore_cache:
+          key: python-wrapper-dependencies-{{ checksum "python_wrapper/pyproject.toml" }}
+      - run:
+          name: Clear cache for mkdocs build
+          command: rm -rf /tmp/pip-cache
+      - restore_cache:
+          key: mkdocs-dependencies-{{ checksum "requirements-docs.txt" }}
+      - run:
+          name: Build mkdocs documentation
+          command: |
+            pip install -r requirements-docs.txt
+            mkdocs build
+            mv site/* gh-pages/
+      - save_cache:
+          key: mkdocs-dependencies-{{ checksum "requirements-docs.txt" }}
+          paths:
+            - "/tmp/pip-cache"
+      - run:
+          name: Set up CNAME
+          command: |
+            echo "container-hive.timo-reymann.de" > gh-pages/CNAME
+      - run:
+          name: Copy ci templates
+          command: |
+            cp -R ci-templates/ gh-pages/
+      - github-utils/publish_github_pages:
+          folder: gh-pages/
+          git_commit_author_email: "no-reply@timo-reymann.de"
+          git_commit_author_name: "CircleCI"
 
 workflows:
   version: 2
@@ -95,6 +133,10 @@ workflows:
       - build:
           requires:
             - test
+      - build-gh-pages:
+          filters:
+            branches:
+              only: main
   #      - semantic-release/with_existing_config:
   #          name: semantic-release
   #          additional_packages: "@google/semantic-release-replace-plugin"
