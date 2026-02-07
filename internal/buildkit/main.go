@@ -6,7 +6,10 @@ import (
 	"io"
 	"os"
 
+	"github.com/docker/cli/cli/config"
 	"github.com/moby/buildkit/client"
+	"github.com/moby/buildkit/session"
+	"github.com/moby/buildkit/session/auth/authprovider"
 	"github.com/timo-reymann/ContainerHive/internal/buildkit/build_context"
 	"github.com/timo-reymann/ContainerHive/internal/buildkit/cache"
 	"github.com/timo-reymann/ContainerHive/internal/utils"
@@ -51,10 +54,15 @@ func (c *Client) Build(ctx context.Context, opts *BuildOpts, statusUpdateHandler
 	var buildCache []client.CacheOptionsEntry
 	if opts.Cache != nil {
 		cacheOpt := opts.Cache
+		attributes := cacheOpt.ToAttributes()
+		_, hasExplicitIgnoreErr := attributes["ignore-errors"]
+		if !hasExplicitIgnoreErr {
+			attributes["ignore-errors"] = "true"
+		}
 		buildCache = []client.CacheOptionsEntry{
 			{
 				Type:  cacheOpt.Name(),
-				Attrs: cacheOpt.ToAttributes(),
+				Attrs: attributes,
 			},
 		}
 	}
@@ -76,7 +84,13 @@ func (c *Client) Build(ctx context.Context, opts *BuildOpts, statusUpdateHandler
 	utils.MergeMapWithPrefix("label:", frontendAttrs, opts.Labels)
 	utils.MergeMapWithPrefix("build-arg:", frontendAttrs, opts.BuildArgs)
 
+	dockerConfig := config.LoadDefaultConfigFile(os.Stderr)
 	solveOpts := client.SolveOpt{
+		Session: []session.Attachable{
+			authprovider.NewDockerAuthProvider(authprovider.DockerAuthProviderConfig{
+				AuthConfigProvider: authprovider.LoadAuthConfig(dockerConfig),
+			}),
+		},
 		CacheExports: buildCache,
 		CacheImports: buildCache,
 		Exports: []client.ExportEntry{

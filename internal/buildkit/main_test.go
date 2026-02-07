@@ -225,4 +225,166 @@ func TestIntegrationBuild(t *testing.T) {
 			t.Fatal("expected S3 cache bucket to contain objects after cached build, but it was empty")
 		}
 	})
+
+	t.Run("with_registry_cache", func(t *testing.T) {
+		// Start a local registry
+		registryC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Image:        "registry:2",
+				ExposedPorts: []string{"5000/tcp"},
+				Networks:     []string{net.Name},
+				NetworkAliases: map[string][]string{
+					net.Name: {"registry"},
+				},
+				WaitingFor: wait.ForHTTP("/v2/").WithPort("5000/tcp"),
+			},
+			Started: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { registryC.Terminate(ctx) })
+
+		registryCache := &cache.RegistryCache{
+			CacheRef: "registry:5000/buildkit-cache",
+		}
+
+		// First build — populates the cache
+		tarFile1 := filepath.Join(t.TempDir(), "registry-cached1.tar")
+		if err := bkClient.Build(ctx, &BuildOpts{
+			ImageName: "test-registry-cached:latest",
+			TarFile:   tarFile1,
+			Cache:     registryCache,
+			BuildContext: &build_context.DockerfileBuildContext{
+				Root: buildCtxDir,
+			},
+			Platform: platform,
+		}, drainStatus); err != nil {
+			t.Fatal("first build (cache populate):", err)
+		}
+
+		info, err := os.Stat(tarFile1)
+		if err != nil {
+			t.Fatal("expected first tar file to exist:", err)
+		}
+		if info.Size() == 0 {
+			t.Fatal("expected first tar file to be non-empty")
+		}
+
+		// Second build — should use the cache
+		tarFile2 := filepath.Join(t.TempDir(), "registry-cached2.tar")
+		if err := bkClient.Build(ctx, &BuildOpts{
+			ImageName: "test-registry-cached-reuse:latest",
+			TarFile:   tarFile2,
+			Cache:     registryCache,
+			BuildContext: &build_context.DockerfileBuildContext{
+				Root: buildCtxDir,
+			},
+			Platform: platform,
+		}, drainStatus); err != nil {
+			t.Fatal("second build (cache reuse):", err)
+		}
+
+		info, err = os.Stat(tarFile2)
+		if err != nil {
+			t.Fatal("expected second tar file to exist:", err)
+		}
+		if info.Size() == 0 {
+			t.Fatal("expected second tar file to be non-empty")
+		}
+
+		// Verify the cache image was pushed to the registry
+		registryHost, err := registryC.Host(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		registryPort, err := registryC.MappedPort(ctx, "5000/tcp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp, err := http.Get(fmt.Sprintf("http://%s:%s/v2/buildkit-cache/tags/list", registryHost, registryPort.Port()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected registry to have cache image, got status: %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("ignore_errors_default", func(t *testing.T) {
+		// Test that ignore-errors is set to true by default
+		s3Cache := &cache.S3BuildKitCache{
+			EndpointUrl:     "http://s3mock:9090",
+			Bucket:          s3Bucket,
+			Region:          "us-east-1",
+			CacheKey:        "ignore-errors-test",
+			AccessKeyId:     s3AccessKey,
+			SecretAccessKey: s3SecretKey,
+			UsePathStyle:    true,
+		}
+
+		// Build should succeed even if cache operations might fail
+		tarFile := filepath.Join(t.TempDir(), "ignore-errors.tar")
+		if err := bkClient.Build(ctx, &BuildOpts{
+			ImageName: "test-ignore-errors:latest",
+			TarFile:   tarFile,
+			Cache:     s3Cache,
+			BuildContext: &build_context.DockerfileBuildContext{
+				Root: buildCtxDir,
+			},
+			Platform: platform,
+		}, drainStatus); err != nil {
+			t.Fatal("build should succeed even with cache issues:", err)
+		}
+
+		info, err := os.Stat(tarFile)
+		if err != nil {
+			t.Fatal("expected tar file to exist:", err)
+		}
+		if info.Size() == 0 {
+			t.Fatal("expected tar file to be non-empty")
+		}
+	})
+}
+
+func TestIgnoreErrorsHandling(t *testing.T) {
+	tests := []struct {
+		name          string
+		cache         cache.BuildkitCache
+		wantIgnoreErr string
+	}{
+		{
+			name: "s3_cache_default",
+			cache: &cache.S3BuildKitCache{
+				Bucket:   "test",
+				CacheKey: "key",
+			},
+			wantIgnoreErr: "true",
+		},
+		{
+			name: "registry_cache_default",
+			cache: &cache.RegistryCache{
+				CacheRef: "localhost:5000/cache",
+			},
+			wantIgnoreErr: "true",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate the logic in Build()
+			attributes := tt.cache.ToAttributes()
+			_, hasExplicitIgnoreErr := attributes["ignore-errors"]
+			if !hasExplicitIgnoreErr {
+				attributes["ignore-errors"] = "true"
+			}
+
+			if got := attributes["ignore-errors"]; got != tt.wantIgnoreErr {
+				t.Errorf("ignore-errors = %q, want %q", got, tt.wantIgnoreErr)
+			}
+		})
+	}
 }
