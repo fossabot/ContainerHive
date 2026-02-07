@@ -1,0 +1,116 @@
+package discovery
+
+import (
+	"path/filepath"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/timo-reymann/ContainerHive/pkg/model"
+)
+
+func mustAbs(t *testing.T, path string) string {
+	t.Helper()
+	path, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return path
+}
+
+func TestDiscoverProject(t *testing.T) {
+	tests := map[string]struct {
+		root     string
+		expected *model.ContainerHiveProject
+		wantErr  bool
+	}{
+		"simple project": {
+			root: "testdata/simple-project",
+			expected: &model.ContainerHiveProject{
+				RootDir:        mustAbs(t, "testdata/simple-project"),
+				ConfigFilePath: mustAbs(t, "testdata/simple-project/hive.yml"),
+				ImagesByIdentifier: map[string]*model.Image{
+					"dotnet/8": {
+						RootDir:            mustAbs(t, "testdata/simple-project/images/dotnet/8"),
+						RootFSDir:          mustAbs(t, "testdata/simple-project/images/dotnet/8/rootfs"),
+						Identifier:         "dotnet/8",
+						Name:               "dotnet",
+						DefinitionFilePath: mustAbs(t, "testdata/simple-project/images/dotnet/8/image.yml"),
+						Variants: map[string]*model.ImageVariant{
+							"node": {
+								Name:               "node",
+								RootDir:            mustAbs(t, "testdata/simple-project/images/dotnet/8/node"),
+								RootFSDir:          mustAbs(t, "testdata/simple-project/images/dotnet/8/node/rootfs"),
+								TestConfigFilePath: mustAbs(t, "testdata/simple-project/images/dotnet/8/node/test.yml.gotpl"),
+								TagSuffix:          "-node",
+								Versions:           model.Versions{"nodejs": "24"},
+							},
+						},
+					},
+					"python": {
+						RootDir:            mustAbs(t, "testdata/simple-project/images/python"),
+						RootFSDir:          mustAbs(t, "testdata/simple-project/images/python/rootfs"),
+						Identifier:         "python",
+						Name:               "python",
+						TestConfigFilePath: mustAbs(t, "testdata/simple-project/images/python/test.yml.gotpl"),
+						DefinitionFilePath: mustAbs(t, "testdata/simple-project/images/python/image.yml"),
+						Versions: model.Versions{
+							"poetry": "2.2.1",
+							"uv":     "0.8.22",
+						},
+						Variants: map[string]*model.ImageVariant{},
+					},
+				},
+				ImagesByName: map[string][]*model.Image{
+					"dotnet": {
+						{
+							Identifier:         "dotnet/8",
+							Name:               "dotnet",
+							RootDir:            mustAbs(t, "testdata/simple-project/images/dotnet/8"),
+							RootFSDir:          mustAbs(t, "testdata/simple-project/images/dotnet/8/rootfs"),
+							DefinitionFilePath: mustAbs(t, "testdata/simple-project/images/dotnet/8/image.yml"),
+							Variants: map[string]*model.ImageVariant{
+								"node": {
+									Name:               "node",
+									RootDir:            mustAbs(t, "testdata/simple-project/images/dotnet/8/node"),
+									RootFSDir:          mustAbs(t, "testdata/simple-project/images/dotnet/8/node/rootfs"),
+									TestConfigFilePath: mustAbs(t, "testdata/simple-project/images/dotnet/8/node/test.yml.gotpl"),
+									TagSuffix:          "-node",
+									Versions:           model.Versions{"nodejs": "24"},
+								},
+							},
+						},
+					},
+					"python": {
+						{
+							Identifier:         "python",
+							Name:               "python",
+							RootDir:            mustAbs(t, "testdata/simple-project/images/python"),
+							RootFSDir:          mustAbs(t, "testdata/simple-project/images/python/rootfs"),
+							TestConfigFilePath: mustAbs(t, "testdata/simple-project/images/python/test.yml.gotpl"),
+							DefinitionFilePath: mustAbs(t, "testdata/simple-project/images/python/image.yml"),
+							Versions: model.Versions{
+								"poetry": "2.2.1",
+								"uv":     "0.8.22",
+							},
+							Variants: map[string]*model.ImageVariant{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := DiscoverProject(t.Context(), tc.root)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("DiscoverProject() error = %v, wantErr %v", err, tc.wantErr)
+			}
+
+			if diff := cmp.Diff(tc.expected, got); diff != "" {
+				t.Errorf("DiscoverProject() mismatch (-expected +got):\n%s", diff)
+			}
+		})
+	}
+}
