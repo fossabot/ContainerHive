@@ -73,7 +73,7 @@ func (c *Client) Build(ctx context.Context, opts *BuildOpts, statusUpdateHandler
 		CacheImports: buildCache,
 		Exports: []client.ExportEntry{
 			{
-				Type: "docker",
+				Type: "oci",
 				Attrs: map[string]string{
 					"name":              opts.ImageName,
 					"rewrite-timestamp": "true",
