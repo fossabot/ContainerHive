@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/timo-reymann/ContainerHive/internal/buildconfig_resolver"
 	"github.com/timo-reymann/ContainerHive/internal/file_resolver"
 	"github.com/timo-reymann/ContainerHive/pkg/model"
 	"golang.org/x/sync/errgroup"
@@ -13,31 +14,31 @@ import (
 
 func processImagesForName(ctx context.Context, rootPath string, images []*model.Image) error {
 	eg, _ := errgroup.WithContext(ctx)
-	for _, image := range images {
-		image := image
+	for _, imageDef := range images {
+		imageDef := imageDef
 
-		for tag, _ := range image.Tags {
+		for tag, tagDef := range imageDef.Tags {
 			tag := tag
+			tagDef := tagDef
 
 			// Tag and variant are safe to run in parallel
 			eg.Go(func() error {
 				tagPath := filepath.Join(rootPath, tag)
-				if err := setupImageDir(tagPath, image); err != nil {
+				if err := setupImageTagDir(tagPath, imageDef, tagDef); err != nil {
 					return err
 				}
 
-				for _, variantDef := range image.Variants {
+				for _, variantDef := range imageDef.Variants {
 					rootPath := rootPath
 					variantDef := variantDef
 
 					eg.Go(func() error {
 						variantPath := filepath.Join(rootPath, tag+variantDef.TagSuffix)
-						if err := setupVariantDir(variantPath, variantDef, image); err != nil {
+						if err := setupVariantDir(variantPath, imageDef, tagDef, variantDef); err != nil {
 							return err
 						}
 						return nil
 					})
-
 				}
 				return nil
 			})
@@ -55,9 +56,17 @@ func createTestsFolder(rootPath string) (string, error) {
 	return testsRoot, nil
 }
 
-func setupImageDir(tagPath string, image *model.Image) error {
+func setupImageTagDir(tagPath string, image *model.Image, tag *model.Tag) error {
 	if err := mkdir(tagPath); err != nil {
 		return errors.Join(errors.New("failed to create tag directory"), err)
+	}
+
+	tmplCtx := newTemplateContext(image, buildconfig_resolver.ForTag(image, tag))
+
+	if image.BuildEntryPointPath != "" {
+		if err := file_resolver.CopyAndRenderFile(tmplCtx, image.BuildEntryPointPath, filepath.Join(tagPath, filepath.Base(image.BuildEntryPointPath))); err != nil {
+			return errors.Join(errors.New("failed to copy build entrypoint"), err)
+		}
 	}
 
 	if image.RootFSDir != "" {
@@ -72,7 +81,7 @@ func setupImageDir(tagPath string, image *model.Image) error {
 			return err
 		}
 
-		if err := file_resolver.CopyAndRenderFile(image.TestConfigFilePath, filepath.Join(testsRoot, "image.yml")); err != nil {
+		if err := file_resolver.CopyAndRenderFile(tmplCtx, image.TestConfigFilePath, filepath.Join(testsRoot, "image.yml")); err != nil {
 			return err
 		}
 	}
@@ -80,9 +89,17 @@ func setupImageDir(tagPath string, image *model.Image) error {
 	return nil
 }
 
-func setupVariantDir(variantPath string, variantDef *model.ImageVariant, image *model.Image) error {
+func setupVariantDir(variantPath string, image *model.Image, tag *model.Tag, variantDef *model.ImageVariant) error {
+	tmplCtx := newTemplateContext(image, buildconfig_resolver.ForTagVariant(image, variantDef, tag))
+
 	if err := mkdir(variantPath); err != nil {
 		return errors.Join(errors.New("failed to create variant directory"), err)
+	}
+
+	if variantDef.BuildEntryPointPath != "" {
+		if err := file_resolver.CopyAndRenderFile(tmplCtx, variantDef.BuildEntryPointPath, filepath.Join(variantPath, filepath.Base(variantDef.BuildEntryPointPath))); err != nil {
+			return errors.Join(errors.New("failed to copy build entrypoint"), err)
+		}
 	}
 
 	if image.RootFSDir != "" {
@@ -104,13 +121,13 @@ func setupVariantDir(variantPath string, variantDef *model.ImageVariant, image *
 		}
 
 		if image.TestConfigFilePath != "" {
-			if err := file_resolver.CopyAndRenderFile(image.TestConfigFilePath, filepath.Join(testsRoot, "image.yml")); err != nil {
+			if err := file_resolver.CopyAndRenderFile(tmplCtx, image.TestConfigFilePath, filepath.Join(testsRoot, "image.yml")); err != nil {
 				return errors.Join(errors.New("failed to copy test config file"), err)
 			}
 		}
 
 		if variantDef.TestConfigFilePath != "" {
-			if err := file_resolver.CopyAndRenderFile(variantDef.TestConfigFilePath, filepath.Join(testsRoot, "variant.yml")); err != nil {
+			if err := file_resolver.CopyAndRenderFile(tmplCtx, variantDef.TestConfigFilePath, filepath.Join(testsRoot, "variant.yml")); err != nil {
 				return errors.Join(errors.New("failed to copy test config file"), err)
 			}
 		}
