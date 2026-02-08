@@ -2,7 +2,7 @@ package templating
 
 import (
 	"bytes"
-	"html/template"
+	"text/template"
 )
 
 type GoTemplateTemplatingProcessor struct{}

@@ -36,9 +36,9 @@ RUN pyenv install "${PYTHON_VERSION}" \
     && pipx install pipenv
 
 ARG UV_VERSION
-RUN pipx install uv=={{ "uv" | resolve_version}}
+RUN pipx install uv==$UV_VERSION
 
 ARG POETRY_VERSION
-RUN pipx install poetry=={{ "poetry" | resolve_version }}
+RUN pipx install poetry==$POETRY_VERSION
 
 USER 1000

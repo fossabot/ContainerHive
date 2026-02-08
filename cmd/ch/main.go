@@ -56,11 +56,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Discovered project: %v", project)
+	log.Printf("Discovered %d image(s) in project %s", len(project.ImagesByIdentifier), project.RootDir)
+	for name, images := range project.ImagesByName {
+		for _, img := range images {
+			log.Printf("  image %q: %d tag(s), %d variant(s)", name, len(img.Tags), len(img.Variants))
+		}
+	}
 
 	if err := rendering.RenderProject(ctx, project, "example/dist"); err != nil {
 		log.Fatal(err)
 	}
+	log.Println("Rendered project to example/dist")
 
 	tmpDir, err := os.MkdirTemp("", "ch-smoke-*")
 	if err != nil {
