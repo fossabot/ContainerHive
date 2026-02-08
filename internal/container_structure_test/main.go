@@ -14,18 +14,18 @@ import (
 )
 
 type TestRunner struct {
-	TestDefinitionPath string
-	Image              string
-	Platform           string
-	ReportFile         string
-	DockerClient       *docker.Client
+	TestDefinitionPaths []string
+	Image               string
+	Platform            string
+	ReportFile          string
+	DockerClient        *docker.Client
 }
 
 func (t *TestRunner) getOptions(output unversioned.OutputValue) *config.StructureTestOptions {
 	return &config.StructureTestOptions{
 		ImagePath:           t.Image,
 		IgnoreRefAnnotation: false,
-		ConfigFiles:         []string{t.TestDefinitionPath},
+		ConfigFiles:         t.TestDefinitionPaths,
 		Platform:            t.Platform,
 		JSON:                true,
 		Output:              output,
@@ -55,15 +55,19 @@ func (t *TestRunner) runTests(channel chan interface{}, imageName string, opts *
 		Platform: opts.Platform,
 	}
 	driverImpl := drivers.InitDriverImpl(opts.Driver)
-	tests, err := test.Parse(t.TestDefinitionPath, args, driverImpl)
-	if err != nil {
-		channel <- &unversioned.TestResult{
-			Errors: []string{
-				fmt.Sprintf("error parsing config file: %s", err),
-			},
+
+	for _, testDefPath := range t.TestDefinitionPaths {
+		tests, err := test.Parse(testDefPath, args, driverImpl)
+		if err != nil {
+			channel <- &unversioned.TestResult{
+				Errors: []string{
+					fmt.Sprintf("error parsing config file: %s", err),
+				},
+			}
 		}
+		tests.RunAll(channel, testDefPath)
 	}
-	tests.RunAll(channel, t.TestDefinitionPath)
+
 	close(channel)
 }
 

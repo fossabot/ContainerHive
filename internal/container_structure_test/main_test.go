@@ -148,11 +148,11 @@ fileExistenceTests:
 	t.Run("passing_tests", func(t *testing.T) {
 		reportFile := filepath.Join(t.TempDir(), "junit.xml")
 		runner := TestRunner{
-			TestDefinitionPath: testDefPath,
-			Image:              tarFile,
-			Platform:           platform,
-			ReportFile:         reportFile,
-			DockerClient:       dockerClient,
+			TestDefinitionPaths: []string{testDefPath},
+			Image:               tarFile,
+			Platform:            platform,
+			ReportFile:          reportFile,
+			DockerClient:        dockerClient,
 		}
 
 		err := runner.Run()
@@ -172,11 +172,11 @@ fileExistenceTests:
 	t.Run("docker_image_without_tar", func(t *testing.T) {
 		reportFile := filepath.Join(t.TempDir(), "junit-docker.xml")
 		runner := TestRunner{
-			TestDefinitionPath: testDefPath,
-			Image:              "cst-test:latest",
-			Platform:           platform,
-			ReportFile:         reportFile,
-			DockerClient:       dockerClient,
+			TestDefinitionPaths: []string{testDefPath},
+			Image:               "cst-test:latest",
+			Platform:            platform,
+			ReportFile:          reportFile,
+			DockerClient:        dockerClient,
 		}
 
 		err := runner.Run()
@@ -208,11 +208,11 @@ fileExistenceTests:
 
 		reportFile := filepath.Join(t.TempDir(), "junit-fail.xml")
 		runner := TestRunner{
-			TestDefinitionPath: failDefPath,
-			Image:              tarFile,
-			Platform:           platform,
-			ReportFile:         reportFile,
-			DockerClient:       dockerClient,
+			TestDefinitionPaths: []string{failDefPath},
+			Image:               tarFile,
+			Platform:            platform,
+			ReportFile:          reportFile,
+			DockerClient:        dockerClient,
 		}
 
 		err := runner.Run()
