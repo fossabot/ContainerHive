@@ -1,0 +1,10 @@
+schemaVersion: 2.0.0
+commandTests:
+  - name: "go-version"
+    command: "go"
+    args: ["version"]
+    expectedOutput: ["go{{.Versions.go}}"]
+metadataTest:
+  labels:
+    - key: "app"
+      value: "{{.ImageName}}"

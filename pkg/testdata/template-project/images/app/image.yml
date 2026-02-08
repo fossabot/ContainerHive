@@ -1,0 +1,7 @@
+versions:
+  go: "1.22"
+
+tags:
+  - name: latest
+    versions:
+      go: "1.22.5"

@@ -1,0 +1,15 @@
+versions:
+  ruby: "3.3"
+
+tags:
+  - name: "3.3.0"
+    versions:
+      ruby: "3.3.0"
+
+variants:
+  - name: slim
+    tag_suffix: -slim
+  - name: full
+    tag_suffix: -full
+    versions:
+      extras: enabled
