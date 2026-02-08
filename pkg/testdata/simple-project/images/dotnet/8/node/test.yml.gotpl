@@ -3,4 +3,4 @@ commandTests:
   - name: "node-version"
     command: "node"
     args: ["--version"]
-    expectedOutput: ["{{ versions.nodejs }}"]
+    expectedOutput: ["{{ .Versions.nodejs }}"]
