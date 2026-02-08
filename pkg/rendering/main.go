@@ -17,7 +17,11 @@ func mkdir(targetPath string) error {
 func processImagesForName(ctx context.Context, rootPath string, images []*model.Image) error {
 	eg, _ := errgroup.WithContext(ctx)
 	for _, image := range images {
+		image := image
+
 		for tag, _ := range image.Tags {
+			tag := tag
+
 			// Tag and variant are safe to run in parallel
 			eg.Go(func() error {
 				tagPath := filepath.Join(rootPath, tag)
@@ -26,10 +30,17 @@ func processImagesForName(ctx context.Context, rootPath string, images []*model.
 				}
 
 				for _, variantDef := range image.Variants {
-					variantPath := filepath.Join(rootPath, tag+variantDef.TagSuffix)
-					if err := setupVariantDir(variantPath, variantDef, image); err != nil {
-						return err
-					}
+					rootPath := rootPath
+					variantDef := variantDef
+
+					eg.Go(func() error {
+						variantPath := filepath.Join(rootPath, tag+variantDef.TagSuffix)
+						if err := setupVariantDir(variantPath, variantDef, image); err != nil {
+							return err
+						}
+						return nil
+					})
+
 				}
 				return nil
 			})
@@ -81,6 +92,7 @@ func RenderProject(ctx context.Context, project *model.ContainerHiveProject, tar
 	eg, _ := errgroup.WithContext(ctx)
 
 	for name, images := range project.ImagesByName {
+		images := images
 		nameRootPath := filepath.Join(targetPath, name)
 		err := mkdir(nameRootPath)
 		if err != nil {
