@@ -5,9 +5,9 @@ type Versions map[string]string
 type BuildArgs map[string]string
 
 type Tag struct {
-	Name     string
-	Versions Versions
-	BuildArgs
+	Name      string    `yaml:"name" json:"name" jsonschema:"Name of the tag"`
+	Versions  Versions  `yaml:"versions" json:"versions,omitempty" jsonschema:"Versions to use for this tag"`
+	BuildArgs BuildArgs `yaml:"build_args" json:"build_args,omitempty" jsonschema:"Build args to specify for this tag"`
 }
 
 type Image struct {

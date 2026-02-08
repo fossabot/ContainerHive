@@ -18,20 +18,6 @@ var imageConfigFileNames = []string{
 	"image.yml",
 }
 
-type variantConfig struct {
-	Name      string
-	TagSuffix string `yaml:"tag_suffix"`
-	Versions  model.Versions
-	BuildArgs model.BuildArgs `yaml:"build_args"`
-}
-
-type imageDefinitionConfig struct {
-	Tags      []*model.Tag
-	Variants  []variantConfig
-	Versions  model.Versions
-	BuildArgs model.BuildArgs `yaml:"build_args"`
-}
-
 func getRoofsPath(imageRoot string) (string, error) {
 	stat, err := os.Stat(filepath.Join(imageRoot, rootFsDirName))
 	if err != nil {
@@ -49,7 +35,7 @@ func getRoofsPath(imageRoot string) (string, error) {
 	return filepath.Join(imageRoot, rootFsDirName), nil
 }
 
-func parseImageConfigFile(configFilePath string) (*imageDefinitionConfig, error) {
+func parseImageConfigFile(configFilePath string) (*model.ImageDefinitionConfig, error) {
 	f, err := os.Open(configFilePath)
 	if err != nil {
 		return nil, err
@@ -58,7 +44,7 @@ func parseImageConfigFile(configFilePath string) (*imageDefinitionConfig, error)
 
 	d := yaml.NewDecoder(f)
 	d.KnownFields(true)
-	var config imageDefinitionConfig
+	var config model.ImageDefinitionConfig
 	if err := d.Decode(&config); err != nil {
 		return nil, err
 	}
@@ -120,7 +106,7 @@ func processImageConfig(projectRoot, configFilePath string) (*model.Image, error
 	}, nil
 }
 
-func processTags(imageDef *imageDefinitionConfig) map[string]*model.Tag {
+func processTags(imageDef *model.ImageDefinitionConfig) map[string]*model.Tag {
 	tags := make(map[string]*model.Tag)
 	for _, tag := range imageDef.Tags {
 		tags[tag.Name] = tag
@@ -128,7 +114,7 @@ func processTags(imageDef *imageDefinitionConfig) map[string]*model.Tag {
 	return tags
 }
 
-func processVariants(imageDef *imageDefinitionConfig, imageRoot string) (map[string]*model.ImageVariant, error) {
+func processVariants(imageDef *model.ImageDefinitionConfig, imageRoot string) (map[string]*model.ImageVariant, error) {
 	indexedVariants := make(map[string]*model.ImageVariant)
 	for _, v := range imageDef.Variants {
 		variantRoot := filepath.Join(imageRoot, v.Name)

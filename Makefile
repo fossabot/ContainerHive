@@ -58,3 +58,7 @@ bundle:
 	@find ./dist/*.zip -type f -exec sh -c 'sha256sum {} | cut -d " " -f 1 > {}.sha256' {} \;
 
 pack: create-checksums bundle ## Create checksums and pack archives for delivery
+
+generate-json-schema: ## Generate the json schemas
+	@go run tools/generate-image-schema.go
+	@go run tools/generate-project-schema.go

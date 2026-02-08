@@ -6,3 +6,6 @@ tags:
   - name: 3.13.7
     versions:
       python: 3.13.7
+
+build_args:
+  foo: bar

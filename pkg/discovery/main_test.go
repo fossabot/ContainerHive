@@ -76,6 +76,7 @@ func TestDiscoverProject(t *testing.T) {
 						RootFSDir:           mustAbs(t, "../testdata/simple-project/images/python/rootfs"),
 						Identifier:          "python",
 						Name:                "python",
+						BuildArgs:           model.BuildArgs{"foo": "bar"},
 						TestConfigFilePath:  mustAbs(t, "../testdata/simple-project/images/python/test.yml.gotpl"),
 						DefinitionFilePath:  mustAbs(t, "../testdata/simple-project/images/python/image.yml"),
 						Versions: model.Versions{
@@ -145,6 +146,7 @@ func TestDiscoverProject(t *testing.T) {
 							RootFSDir:           mustAbs(t, "../testdata/simple-project/images/python/rootfs"),
 							TestConfigFilePath:  mustAbs(t, "../testdata/simple-project/images/python/test.yml.gotpl"),
 							DefinitionFilePath:  mustAbs(t, "../testdata/simple-project/images/python/image.yml"),
+							BuildArgs:           model.BuildArgs{"foo": "bar"},
 							Versions: model.Versions{
 								"poetry": "2.2.1",
 								"uv":     "0.8.22",

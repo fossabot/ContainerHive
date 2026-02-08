@@ -111,6 +111,11 @@ jobs:
             pip install -r requirements-docs.txt
             mkdocs build
             mv site/* gh-pages/
+      - run:
+          name: Copy schemas
+          command: |
+            mkdir -p gh-pages/_schemas
+            cp -r schemas/* gh-pages/_schemas/
       - save_cache:
           key: mkdocs-dependencies-{{ checksum "requirements-docs.txt" }}
           paths:
