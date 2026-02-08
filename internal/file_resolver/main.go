@@ -1,6 +1,10 @@
 package file_resolver
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+)
 
 const TemplateExtensionGoTemplate = "gotpl"
 
@@ -20,8 +24,8 @@ func GetFileCandidates(baseName string, extensions ...string) []string {
 	} else {
 		possibleNames = make([]string, extLen*len(SupportedTemplateExtensions))
 		idx := 0
-		for _, tmplExt := range SupportedTemplateExtensions {
-			for _, ext := range extensions {
+		for _, ext := range extensions {
+			for _, tmplExt := range SupportedTemplateExtensions {
 				possibleNames[idx] = fmt.Sprintf("%s.%s.%s", baseName, ext, tmplExt)
 				idx++
 			}
@@ -29,4 +33,14 @@ func GetFileCandidates(baseName string, extensions ...string) []string {
 	}
 
 	return possibleNames
+}
+
+func ResolveFirstExistingFile(root string, candidates ...string) (string, error) {
+	for _, candidate := range candidates {
+		candidatePath := filepath.Join(root, candidate)
+		if stat, err := os.Stat(candidatePath); err == nil && !stat.IsDir() {
+			return candidatePath, nil
+		}
+	}
+	return "", nil
 }
