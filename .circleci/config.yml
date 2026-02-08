@@ -100,11 +100,6 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: python-wrapper-dependencies-{{ checksum "python_wrapper/pyproject.toml" }}
-      - run:
-          name: Clear cache for mkdocs build
-          command: rm -rf /tmp/pip-cache
-      - restore_cache:
           key: mkdocs-dependencies-{{ checksum "requirements-docs.txt" }}
       - run:
           name: Build mkdocs documentation
