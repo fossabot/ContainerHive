@@ -72,6 +72,8 @@ func setupVariantDir(variantPath string, variantDef *model.ImageVariant, image *
 }
 
 func RenderProject(ctx context.Context, project *model.ContainerHiveProject, targetPath string) error {
+	_ = os.RemoveAll(targetPath)
+
 	err := mkdir(targetPath)
 	if err != nil {
 		return errors.Join(errors.New("failed to create target directory"), err)
