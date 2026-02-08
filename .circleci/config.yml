@@ -111,6 +111,7 @@ jobs:
             pip install -r requirements-docs.txt
             mkdocs build
             mv site/* gh-pages/
+            touch gh-pages/.nojekyll
       - run:
           name: Copy schemas
           command: |
