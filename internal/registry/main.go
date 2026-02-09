@@ -1,0 +1,29 @@
+package registry
+
+import (
+	"context"
+	"os"
+)
+
+// Registry manages an OCI registry for staging local base images.
+type Registry interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+	Address() string
+	Push(ctx context.Context, imageName, tag, ociTarPath string) error
+	IsLocal() bool
+}
+
+// NewRegistry creates a Registry based on the environment.
+// In CI (CI env var set), it returns a remote registry passthrough.
+// Otherwise, it returns an embedded zot registry for local builds.
+func NewRegistry() Registry {
+	if ci := os.Getenv("CI"); ci != "" {
+		remoteAddr := os.Getenv("CONTAINER_HIVE_REGISTRY")
+		if remoteAddr == "" {
+			remoteAddr = "docker.io"
+		}
+		return NewRemoteRegistry(remoteAddr)
+	}
+	return NewZotRegistry()
+}
