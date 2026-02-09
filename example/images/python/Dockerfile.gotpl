@@ -1,4 +1,4 @@
-FROM base
+FROM {{ resolve_base "ubuntu" "22.04" }}
 USER 0
 
 ENV PYENV_ROOT=/usr/share/pyenv \
