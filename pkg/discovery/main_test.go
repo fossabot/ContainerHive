@@ -180,3 +180,36 @@ func TestDiscoverProject(t *testing.T) {
 		})
 	}
 }
+
+func TestDiscoverProject_DependencyProject(t *testing.T) {
+	project, err := DiscoverProject(t.Context(), "../testdata/dependency-project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	t.Run("discovers both images", func(t *testing.T) {
+		if len(project.ImagesByIdentifier) != 2 {
+			t.Errorf("expected 2 images, got %d", len(project.ImagesByIdentifier))
+		}
+	})
+
+	t.Run("python has depends_on", func(t *testing.T) {
+		python := project.ImagesByIdentifier["python"]
+		if python == nil {
+			t.Fatal("python image not found")
+		}
+		if len(python.DependsOn) != 1 || python.DependsOn[0] != "ubuntu" {
+			t.Errorf("expected depends_on=[ubuntu], got %v", python.DependsOn)
+		}
+	})
+
+	t.Run("ubuntu has no depends_on", func(t *testing.T) {
+		ubuntu := project.ImagesByIdentifier["ubuntu"]
+		if ubuntu == nil {
+			t.Fatal("ubuntu image not found")
+		}
+		if len(ubuntu.DependsOn) != 0 {
+			t.Errorf("expected empty depends_on, got %v", ubuntu.DependsOn)
+		}
+	})
+}

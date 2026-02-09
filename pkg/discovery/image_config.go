@@ -103,6 +103,7 @@ func processImageConfig(projectRoot, configFilePath string) (*model.Image, error
 		BuildArgs:           parsedImageDef.BuildArgs,
 		Variants:            indexedVariants,
 		Tags:                processTags(parsedImageDef),
+		DependsOn:           parsedImageDef.DependsOn,
 	}, nil
 }
 
