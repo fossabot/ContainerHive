@@ -109,4 +109,32 @@ func TestGoTemplateTemplatingProcessor_Process(t *testing.T) {
 			t.Errorf("expected %q, got %q", "static content", string(got))
 		}
 	})
+
+	t.Run("renders resolve_base function", func(t *testing.T) {
+		ctx := &TemplateContext{
+			Versions: model.Versions{"go": "1.22"},
+		}
+
+		got, err := processor.Process(ctx, "test.gotpl", []byte(`FROM {{ resolve_base "ubuntu" "22.04" }}`))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if string(got) != "FROM __hive__/ubuntu:22.04" {
+			t.Errorf("expected %q, got %q", "FROM __hive__/ubuntu:22.04", string(got))
+		}
+	})
+
+	t.Run("renders resolve_base with version variable", func(t *testing.T) {
+		ctx := &TemplateContext{
+			Versions: model.Versions{"ubuntu_tag": "22.04"},
+		}
+
+		got, err := processor.Process(ctx, "test.gotpl", []byte(`FROM {{ resolve_base "ubuntu" .Versions.ubuntu_tag }}`))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if string(got) != "FROM __hive__/ubuntu:22.04" {
+			t.Errorf("expected %q, got %q", "FROM __hive__/ubuntu:22.04", string(got))
+		}
+	})
 }

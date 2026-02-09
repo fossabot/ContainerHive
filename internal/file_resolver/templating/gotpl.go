@@ -2,13 +2,20 @@ package templating
 
 import (
 	"bytes"
+	"fmt"
 	"text/template"
 )
 
 type GoTemplateTemplatingProcessor struct{}
 
 func (g *GoTemplateTemplatingProcessor) renderTemplate(path string, raw []byte, data interface{}) ([]byte, error) {
-	tpl := template.New(path)
+	funcMap := template.FuncMap{
+		"resolve_base": func(name, tag string) string {
+			return fmt.Sprintf("__hive__/%s:%s", name, tag)
+		},
+	}
+
+	tpl := template.New(path).Funcs(funcMap)
 	parsed, err := tpl.Parse(string(raw))
 	if err != nil {
 		return nil, err
