@@ -21,13 +21,14 @@ type Client struct {
 }
 
 type BuildOpts struct {
-	ImageName    string
-	Platform     string
-	TarFile      string
-	BuildArgs    map[string]string
-	Labels       map[string]string
-	Cache        cache.BuildkitCache
-	BuildContext build_context.BuildContext
+	ImageName       string
+	Platform        string
+	TarFile         string
+	BuildArgs       map[string]string
+	Labels          map[string]string
+	Cache           cache.BuildkitCache
+	BuildContext    build_context.BuildContext
+	RegistryAddress string // local registry address for __hive__/ resolution
 }
 
 func NewClient(ctx context.Context, endpoint string) (*Client, error) {
