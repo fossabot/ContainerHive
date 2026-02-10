@@ -111,6 +111,44 @@ func TestGraph_TopologicalSort(t *testing.T) {
 	})
 }
 
+func TestGraph_Dependents(t *testing.T) {
+	t.Run("returns images that depend on given image", func(t *testing.T) {
+		g := NewGraph()
+		g.AddImage("ubuntu")
+		g.AddImage("dotnet")
+		g.AddImage("python")
+		g.AddDependency("dotnet", "ubuntu")
+		g.AddDependency("python", "ubuntu")
+
+		deps := g.Dependents("ubuntu")
+		if len(deps) != 2 {
+			t.Fatalf("expected 2 dependents, got %d", len(deps))
+		}
+	})
+
+	t.Run("returns empty for leaf image", func(t *testing.T) {
+		g := NewGraph()
+		g.AddImage("ubuntu")
+		g.AddImage("dotnet")
+		g.AddDependency("dotnet", "ubuntu")
+
+		deps := g.Dependents("dotnet")
+		if len(deps) != 0 {
+			t.Fatalf("expected 0 dependents, got %d", len(deps))
+		}
+	})
+
+	t.Run("returns empty for image with no edges", func(t *testing.T) {
+		g := NewGraph()
+		g.AddImage("standalone")
+
+		deps := g.Dependents("standalone")
+		if len(deps) != 0 {
+			t.Fatalf("expected 0 dependents, got %d", len(deps))
+		}
+	})
+}
+
 func TestGraph_HasDependencies(t *testing.T) {
 	t.Run("returns false when no edges", func(t *testing.T) {
 		g := NewGraph()
