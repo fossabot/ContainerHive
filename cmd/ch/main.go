@@ -5,20 +5,24 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/util/progress/progressui"
+	"github.com/timo-reymann/ContainerHive/internal/buildconfig_resolver"
 	"github.com/timo-reymann/ContainerHive/internal/buildkit"
 	"github.com/timo-reymann/ContainerHive/internal/buildkit/build_context"
 	"github.com/timo-reymann/ContainerHive/internal/buildkit/cache"
-	containerStructureTest "github.com/timo-reymann/ContainerHive/internal/container_structure_test"
+	"github.com/timo-reymann/ContainerHive/internal/container_structure_test"
 	"github.com/timo-reymann/ContainerHive/internal/dependency"
 	"github.com/timo-reymann/ContainerHive/internal/docker"
 	"github.com/timo-reymann/ContainerHive/internal/registry"
 	"github.com/timo-reymann/ContainerHive/internal/syft"
 	"github.com/timo-reymann/ContainerHive/pkg/discovery"
+	"github.com/timo-reymann/ContainerHive/pkg/model"
 	"github.com/timo-reymann/ContainerHive/pkg/rendering"
 )
 
@@ -28,31 +32,115 @@ const (
 
 	// Matches hack/garage/init.sh S3 cache configuration
 	// Note: Use docker-compose service name 'garage' since buildkitd runs in container
-	s3Endpoint  = "http://garage:3900"
+	s3Endpoint  = "http://127.0.0.1:39505"
 	s3Bucket    = "buildkit-cache"
 	s3Region    = "garage"
 	s3AccessKey = "GK31337cafe000000000000000"
 	s3SecretKey = "1337cafe0000000000000000000000000000000000000000000000000000dead"
 
-	imageName  = "ch-smoke-test:latest"
-	sbomFormat = "syft-json"
+	imageName = "ch-smoke-test:latest"
 )
 
 var platform = "linux/" + runtime.GOARCH
 
-const dockerfile = `FROM alpine:latest
-RUN echo hello > /hello.txt
-`
+// newProgressWriter returns a buildkit status handler that displays build progress.
+func newProgressWriter() func(chan *client.SolveStatus) error {
+	return func(ch chan *client.SolveStatus) error {
+		d, err := progressui.NewDisplay(os.Stdout, progressui.TtyMode)
+		if err != nil {
+			d, _ = progressui.NewDisplay(os.Stdout, progressui.PlainMode)
+		}
+		_, err = d.UpdateFrom(context.TODO(), ch)
+		return err
+	}
+}
 
-const testConfig = `schemaVersion: 2.0.0
+// patchHiveRefs rewrites __hive__/ references in a Dockerfile for registry use.
+// Returns the patched file path and a cleanup function.
+func patchHiveRefs(dockerfilePath, registryAddr string) (string, func()) {
+	patched := dockerfilePath + ".patched"
+	if err := build_context.RewriteHiveRefs(dockerfilePath, patched, registryAddr); err != nil {
+		log.Fatalf("Failed to rewrite hive refs for %s: %v", dockerfilePath, err)
+	}
+	return patched, func() { os.Remove(patched) }
+}
 
-fileExistenceTests:
-  - name: 'hello.txt exists'
-    path: '/hello.txt'
-    shouldExist: true
-`
+// tarFilePath returns the OCI tar output path inside the rendered dist directory for a given image tag.
+func tarFilePath(distPath, name, tag string) string {
+	return filepath.Join(distPath, name, tag, "image.tar")
+}
+
+// collectTestDefinitions finds test YAML files in a rendered dist directory's tests/ subfolder.
+func collectTestDefinitions(distDir string) []string {
+	testsDir := filepath.Join(distDir, "tests")
+	entries, err := os.ReadDir(testsDir)
+	if err != nil {
+		return nil
+	}
+	var paths []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			paths = append(paths, filepath.Join(testsDir, e.Name()))
+		}
+	}
+	return paths
+}
+
+// generateSBOM generates an SPDX SBOM from a built image tar and writes it alongside the tar.
+func generateSBOM(ctx context.Context, sbomTool *syft.SBOMImageTool, tarFile, imageTag string) {
+	log.Printf("Generating SBOM for %s ...", imageTag)
+	sbomResult, err := sbomTool.GenerateSBOM(ctx, tarFile)
+	if err != nil {
+		log.Printf("Warning: SBOM generation failed for %s: %v", imageTag, err)
+		return
+	}
+	serialized, err := sbomTool.SerializeSBOM(sbomResult, "spdx-json")
+	if err != nil {
+		log.Printf("Warning: SBOM serialization failed for %s: %v", imageTag, err)
+		return
+	}
+	sbomPath := tarFile + ".sbom.spdx.json"
+	if err := os.WriteFile(sbomPath, serialized, 0644); err != nil {
+		log.Printf("Warning: Failed to write SBOM for %s: %v", imageTag, err)
+		return
+	}
+	log.Printf("SBOM written for %s -> %s (%d bytes)", imageTag, sbomPath, len(serialized))
+}
+
+// runContainerStructureTests runs container structure tests for a built image tar.
+func runContainerStructureTests(dockerClient *docker.Client, tarFile string, testDefs []string, imageTag, reportDir string) {
+	if len(testDefs) == 0 {
+		log.Printf("No container-structure-test definitions for %s, skipping", imageTag)
+		return
+	}
+
+	reportFile := filepath.Join(reportDir, fmt.Sprintf("%s-cst-report.xml", strings.ReplaceAll(imageTag, ":", "-")))
+	log.Printf("Running container-structure-tests for %s (%d test file(s))...", imageTag, len(testDefs))
+
+	runner := &container_structure_test.TestRunner{
+		TestDefinitionPaths: testDefs,
+		Image:               tarFile,
+		Platform:            platform,
+		ReportFile:          reportFile,
+		DockerClient:        dockerClient,
+	}
+
+	if err := runner.Run(); err != nil {
+		log.Printf("Warning: Container structure tests failed for %s: %v", imageTag, err)
+		return
+	}
+	log.Printf("Container structure tests passed for %s -> %s", imageTag, reportFile)
+}
 
 func main() {
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt)
+
+	go func() {
+		<-done
+		os.Exit(0)
+	}()
+
 	ctx := context.TODO()
 	project, err := discovery.DiscoverProject(ctx, "example")
 	if err != nil {
@@ -90,51 +178,13 @@ func main() {
 	}
 	log.Printf("Build order: %v", buildOrder)
 
-	// Step: Start local registry if there are inter-image dependencies
-	if graph.HasDependencies() {
-		reg := registry.NewRegistry()
-		if err := reg.Start(ctx); err != nil {
-			log.Fatalf("Failed to start registry: %v", err)
-		}
-		defer reg.Stop(ctx)
-		log.Printf("Registry started: local=%v address=%s", reg.IsLocal(), reg.Address())
-
-		// In a real build, for each image in buildOrder:
-		//   1. build_context.RewriteHiveRefs(dockerfile, reg.Address())
-		//   2. Build via BuildKit
-		//   3. If other images depend on it: reg.Push(ctx, name, tag, tarPath)
-		log.Println("(Ordered build with registry would happen here)")
-	} else {
-		log.Println("No inter-image dependencies, skipping registry")
-	}
-
-	tmpDir, err := os.MkdirTemp("", "ch-smoke-*")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Write dummy Dockerfile
-	buildCtxDir := filepath.Join(tmpDir, "build")
-	if err := os.MkdirAll(buildCtxDir, 0755); err != nil {
-		log.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(buildCtxDir, "Dockerfile"), []byte(dockerfile), 0644); err != nil {
+	reportDir := "example/reports"
+	if err := os.MkdirAll(reportDir, 0755); err != nil {
 		log.Fatal(err)
 	}
 
-	tarFile := filepath.Join(tmpDir, "image.tar")
-	testDefPath := filepath.Join(tmpDir, "test.yml")
-	reportFile := filepath.Join(tmpDir, "report.xml")
-	sbomFile := filepath.Join(tmpDir, "sbom.json")
-
-	// Write container structure test config
-	if err := os.WriteFile(testDefPath, []byte(testConfig), 0644); err != nil {
-		log.Fatal(err)
-	}
-
-	// Step 1: Build image with BuildKit
-	log.Println("Step 1: Building image with BuildKit (with S3 cache)...")
+	// Initialize BuildKit client
+	log.Println("Connecting to BuildKit...")
 	bkClient, err := buildkit.NewClient(ctx, buildkitAddr)
 	if err != nil {
 		log.Fatalf("Failed to connect to BuildKit at %s: %v", buildkitAddr, err)
@@ -146,6 +196,19 @@ func main() {
 		log.Fatalf("Failed to get BuildKit version: %v", err)
 	}
 	log.Printf("BuildKit version: %s", version)
+
+	// Initialize SBOM tool
+	sbomTool, err := syft.NewSBOMImageTool()
+	if err != nil {
+		log.Fatalf("Failed to initialize SBOM tool: %v", err)
+	}
+
+	// Initialize Docker client for container-structure-tests
+	dockerClient, err := docker.NewClient()
+	if err != nil {
+		log.Fatalf("Failed to initialize Docker client: %v", err)
+	}
+	defer dockerClient.Close()
 
 	// Configure S3 cache (matches hack/docker-compose.yml garage service)
 	s3Cache := &cache.S3BuildKitCache{
@@ -159,71 +222,169 @@ func main() {
 	}
 	log.Printf("S3 cache configured: endpoint=%s, bucket=%s", s3Endpoint, s3Bucket)
 
-	err = bkClient.Build(ctx, &buildkit.BuildOpts{
-		ImageName: imageName,
-		Platform:  platform,
-		TarFile:   tarFile,
-		Cache:     s3Cache,
-		BuildContext: &build_context.DockerfileBuildContext{
-			Root: buildCtxDir,
-		},
-	}, func(ch chan *client.SolveStatus) error {
-		d, err := progressui.NewDisplay(os.Stdout, progressui.TtyMode)
-		if err != nil {
-			// If an error occurs while attempting to create the tty display,
-			// fallback to using plain mode on stdout (in contrast to stderr).
-			d, _ = progressui.NewDisplay(os.Stdout, progressui.PlainMode)
+	// Step: Build images according to DAG
+	if graph.HasDependencies() {
+		reg := registry.NewRegistry()
+		if err := reg.Start(ctx); err != nil {
+			log.Fatalf("Failed to start registry: %v", err)
 		}
-		// not using shared context to not disrupt display but let is finish reporting errors
-		_, err = d.UpdateFrom(context.TODO(), ch)
-		return err
-	})
-	if err != nil {
-		log.Fatalf("Build failed: %v", err)
-	}
-	log.Printf("Image built: %s -> %s", imageName, tarFile)
+		defer reg.Stop(ctx)
+		log.Printf("Registry started: local=%v address=%s", reg.IsLocal(), reg.Address())
 
-	// Step 2: Run container structure tests
-	log.Println("Step 2: Running container structure tests...")
-	dockerClient, err := docker.NewClient()
-	if err != nil {
-		log.Fatalf("Failed to create Docker client: %v", err)
-	}
-	defer dockerClient.Close()
+		// Build images in topological order
+		for _, imgName := range buildOrder {
+			log.Printf("Building image: %s", imgName)
 
-	runner := &containerStructureTest.TestRunner{
-		TestDefinitionPaths: []string{testDefPath},
-		Image:               tarFile,
-		Platform:            platform,
-		ReportFile:          reportFile,
-		DockerClient:        dockerClient,
-	}
-	if err := runner.Run(); err != nil {
-		log.Fatalf("Container structure tests failed: %v", err)
-	}
-	log.Printf("Test report written to %s", reportFile)
+			// Find the image definition
+			var imageDef *model.Image
+			for _, img := range project.ImagesByIdentifier {
+				if img.Name == imgName {
+					imageDef = img
+					break
+				}
+			}
+			if imageDef == nil {
+				log.Printf("Warning: Image %s not found in project", imgName)
+				continue
+			}
 
-	// Step 3: Generate SBOM
-	log.Println("Step 3: Generating SBOM...")
-	sbomTool, err := syft.NewSBOMImageTool()
-	if err != nil {
-		log.Fatalf("Failed to create SBOM tool: %v", err)
+			// Build all tags for this image
+			for tagName := range imageDef.Tags {
+				// Find the rendered Dockerfile path - format is distPath/imageName/tagName/Dockerfile
+				dockerfilePath := filepath.Join(distPath, imgName, tagName, "Dockerfile")
+				if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+					log.Fatalf("Dockerfile not found for %s:%s at %s", imgName, tagName, dockerfilePath)
+				}
+
+				// Patch hive from container ref
+				patchedPath, cleanup := patchHiveRefs(dockerfilePath, reg.Address())
+				defer cleanup()
+
+				// Build the image
+				root, _ := filepath.Abs(filepath.Dir(patchedPath))
+				imageTag := fmt.Sprintf("%s:%s", imgName, tagName)
+				tf := tarFilePath(distPath, imgName, tagName)
+				err = bkClient.Build(ctx, &buildkit.BuildOpts{
+					ImageName: imageTag,
+					Platform:  platform,
+					TarFile:   tf,
+					Cache:     s3Cache,
+					BuildContext: &build_context.DockerfileBuildContext{
+						Root:       root,
+						Dockerfile: "Dockerfile.patched",
+					},
+					BuildArgs: buildconfig_resolver.
+						ForTag(imageDef, imageDef.Tags[tagName]).
+						ToBuildArgs(),
+				}, newProgressWriter())
+				if err != nil {
+					log.Printf("Warning: Build failed for %s: %v", imageTag, err)
+					continue
+				}
+				log.Printf("Built %s -> %s", imageTag, tf)
+
+				generateSBOM(ctx, sbomTool, tf, imageTag)
+				testDefs := collectTestDefinitions(filepath.Join(distPath, imgName, tagName))
+				runContainerStructureTests(dockerClient, tf, testDefs, imageTag, reportDir)
+
+				// Build all variants for this tag
+				for variantName, variantDef := range imageDef.Variants {
+					variantDockerfilePath := filepath.Join(distPath, imgName, tagName+variantDef.TagSuffix, "Dockerfile")
+					if _, err := os.Stat(variantDockerfilePath); os.IsNotExist(err) {
+						log.Printf("Warning: Dockerfile not found for variant %s:%s:%s at %s", imgName, tagName, variantName, variantDockerfilePath)
+						continue
+					}
+
+					variantPatchedPath, variantCleanup := patchHiveRefs(variantDockerfilePath, reg.Address())
+					defer variantCleanup()
+
+					variantRoot, _ := filepath.Abs(filepath.Dir(variantPatchedPath))
+					variantTag := fmt.Sprintf("%s:%s%s", imgName, tagName, variantDef.TagSuffix)
+					variantTf := tarFilePath(distPath, imgName, tagName+variantDef.TagSuffix)
+					err = bkClient.Build(ctx, &buildkit.BuildOpts{
+						ImageName: variantTag,
+						Platform:  platform,
+						TarFile:   variantTf,
+						Cache:     s3Cache,
+						BuildContext: &build_context.DockerfileBuildContext{
+							Root:       variantRoot,
+							Dockerfile: "Dockerfile.patched",
+						},
+						BuildArgs: buildconfig_resolver.
+							ForTagVariant(imageDef, variantDef, imageDef.Tags[tagName]).
+							ToBuildArgs(),
+					}, newProgressWriter())
+					if err != nil {
+						log.Printf("Warning: Build failed for variant %s: %v", variantTag, err)
+						continue
+					}
+					log.Printf("Built variant %s -> %s", variantTag, variantTf)
+
+					generateSBOM(ctx, sbomTool, variantTf, variantTag)
+					variantTestDefs := collectTestDefinitions(filepath.Join(distPath, imgName, tagName+variantDef.TagSuffix))
+					runContainerStructureTests(dockerClient, variantTf, variantTestDefs, variantTag, reportDir)
+
+					// Push variant to local registry if other images depend on it
+					if deps := graph.Dependents(imgName); len(deps) > 0 {
+						if err := reg.Push(ctx, imgName, tagName+variantDef.TagSuffix, variantTf); err != nil {
+							log.Printf("Warning: Failed to push variant %s to registry: %v", variantTag, err)
+						} else {
+							log.Printf("Pushed variant %s to local registry", variantTag)
+						}
+					}
+				}
+
+				// Push to local registry if other images depend on it
+				if deps := graph.Dependents(imgName); len(deps) > 0 {
+					if err := reg.Push(ctx, imgName, tagName, tf); err != nil {
+						log.Printf("Warning: Failed to push %s:%s to registry: %v", imgName, tagName, err)
+					} else {
+						log.Printf("Pushed %s:%s to local registry", imgName, tagName)
+					}
+				}
+			}
+		}
+	} else {
+		log.Println("No inter-image dependencies, building without registry")
+
+		// Build images in any order (no dependencies)
+		for _, images := range project.ImagesByName {
+			for _, imageDef := range images {
+				log.Printf("Building image: %s", imageDef.Name)
+
+				// Build all tags for this image
+				for tagName := range imageDef.Tags {
+					// Find the rendered Dockerfile path - format is distPath/imageName/tagName/Dockerfile
+					dockerfilePath := filepath.Join(distPath, imageDef.Name, tagName, "Dockerfile")
+					if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+						log.Printf("Warning: Dockerfile not found for %s:%s at %s", imageDef.Name, tagName, dockerfilePath)
+						continue
+					}
+
+					// Build the image
+					imageTag := fmt.Sprintf("%s:%s", imageDef.Name, tagName)
+					tf := tarFilePath(distPath, imageDef.Name, tagName)
+
+					err = bkClient.Build(ctx, &buildkit.BuildOpts{
+						ImageName: imageTag,
+						Platform:  platform,
+						TarFile:   tf,
+						Cache:     s3Cache,
+						BuildContext: &build_context.DockerfileBuildContext{
+							Root: filepath.Dir(dockerfilePath),
+						},
+					}, newProgressWriter())
+					if err != nil {
+						log.Fatalf("Build failed for %s: %v", imageTag, err)
+					}
+					log.Printf("Built %s -> %s", imageTag, tf)
+
+					generateSBOM(ctx, sbomTool, tf, imageTag)
+					testDefs := collectTestDefinitions(filepath.Join(distPath, imageDef.Name, tagName))
+					runContainerStructureTests(dockerClient, tf, testDefs, imageTag, reportDir)
+				}
+			}
+		}
 	}
 
-	generatedSBOM, err := sbomTool.GenerateSBOM(ctx, tarFile)
-	if err != nil {
-		log.Fatalf("SBOM generation failed: %v", err)
-	}
-
-	sbomBytes, err := sbomTool.SerializeSBOM(generatedSBOM, sbomFormat)
-	if err != nil {
-		log.Fatalf("SBOM serialization failed: %v", err)
-	}
-
-	if err := os.WriteFile(sbomFile, sbomBytes, 0644); err != nil {
-		log.Fatalf("Failed to write SBOM: %v", err)
-	}
-	log.Printf("SBOM written to %s (%s)", sbomFile, sbomFormat)
-
-	fmt.Println("All steps completed successfully.")
 }
