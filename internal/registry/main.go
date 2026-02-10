@@ -21,6 +21,7 @@ func NewRegistry() Registry {
 	if ci := os.Getenv("CI"); ci != "" {
 		remoteAddr := os.Getenv("CONTAINER_HIVE_REGISTRY")
 		if remoteAddr == "" {
+			// TODO Use actual config value from tbd global configuration file
 			remoteAddr = "docker.io"
 		}
 		return NewRemoteRegistry(remoteAddr)
