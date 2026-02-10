@@ -108,7 +108,7 @@ func TestRenderProject_TemplateProject(t *testing.T) {
 
 	t.Run("renders Dockerfile.gotpl with version", func(t *testing.T) {
 		// Build entrypoint preserves original filename
-		df := filepath.Join(tagDir, "Dockerfile.gotpl")
+		df := filepath.Join(tagDir, "Dockerfile")
 		assertFileExists(t, df)
 		assertFileContains(t, df, "FROM golang:1.22.5")
 	})
@@ -236,7 +236,7 @@ func TestRenderProject_DependencyTemplateProject(t *testing.T) {
 	dist := discoverAndRender(t, "../testdata/dependency-template-project")
 
 	t.Run("renders resolve_base to __hive__/ prefix", func(t *testing.T) {
-		df := filepath.Join(dist, "app", "latest", "Dockerfile.gotpl")
+		df := filepath.Join(dist, "app", "latest", "Dockerfile")
 		assertFileExists(t, df)
 		assertFileContains(t, df, "FROM __hive__/ubuntu:22.04")
 	})

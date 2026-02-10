@@ -26,12 +26,12 @@ func TestDockerfileBuildContext_FileName(t *testing.T) {
 		{
 			name:       "path with directory",
 			dockerfile: "docker/Dockerfile.dev",
-			expected:   "Dockerfile.dev",
+			expected:   "docker/Dockerfile.dev",
 		},
 		{
 			name:       "nested path",
 			dockerfile: "path/to/custom/Dockerfile",
-			expected:   "Dockerfile",
+			expected:   "path/to/custom/Dockerfile",
 		},
 	}
 
@@ -156,7 +156,7 @@ func TestRewriteHiveRefs(t *testing.T) {
 		df := filepath.Join(dir, "Dockerfile")
 		os.WriteFile(df, []byte("FROM __hive__/ubuntu:22.04\nRUN echo hello"), 0644)
 
-		err := RewriteHiveRefs(df, "localhost:5123")
+		err := RewriteHiveRefs(df, df, "localhost:5123")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -174,7 +174,7 @@ func TestRewriteHiveRefs(t *testing.T) {
 		content := "FROM __hive__/ubuntu:22.04 AS base\nFROM __hive__/node:20 AS builder\nRUN echo hello"
 		os.WriteFile(df, []byte(content), 0644)
 
-		err := RewriteHiveRefs(df, "registry.example.com")
+		err := RewriteHiveRefs(df, df, "registry.example.com")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -194,7 +194,7 @@ func TestRewriteHiveRefs(t *testing.T) {
 		content := "FROM ubuntu:22.04\nRUN echo hello"
 		os.WriteFile(df, []byte(content), 0644)
 
-		err := RewriteHiveRefs(df, "localhost:5123")
+		err := RewriteHiveRefs(df, df, "localhost:5123")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
