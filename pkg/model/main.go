@@ -20,6 +20,7 @@ type Image struct {
 	BuildEntryPointPath string
 	Versions            Versions
 	BuildArgs           BuildArgs `yaml:"build_args"`
+	Secrets             Secrets   `yaml:"secrets"`
 	Tags                map[string]*Tag
 	Variants            map[string]*ImageVariant
 	DependsOn           []string
