@@ -7,7 +7,6 @@ type Secrets map[string]Secret
 // Secret represents a named secret with its value configuration
 // This is a simplified version for the model package
 type Secret struct {
-	Name       string `yaml:"name" json:"name" jsonschema:"Name of the secret"`
 	SourceType string `yaml:"source,omitempty" json:"source,omitempty" jsonschema:"Source type of the secret (env, plain). If omitted, auto-detected from value."`
 	Value      string `yaml:"value" json:"value" jsonschema:"Value of the secret (env var name or plain text)"`
 }
