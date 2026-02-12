@@ -101,6 +101,7 @@ func processImageConfig(projectRoot, configFilePath string) (*model.Image, error
 		DefinitionFilePath:  configFilePath,
 		Versions:            parsedImageDef.Versions,
 		BuildArgs:           parsedImageDef.BuildArgs,
+		Secrets:             parsedImageDef.Secrets,
 		Variants:            indexedVariants,
 		Tags:                processTags(parsedImageDef),
 		DependsOn:           parsedImageDef.DependsOn,

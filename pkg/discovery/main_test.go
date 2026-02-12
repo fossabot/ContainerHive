@@ -37,6 +37,7 @@ func TestDiscoverProject(t *testing.T) {
 						Identifier:          "dotnet/8",
 						Name:                "dotnet",
 						DefinitionFilePath:  mustAbs(t, "../testdata/simple-project/images/dotnet/8/image.yml"),
+						Secrets:             model.Secrets{},
 						Variants: map[string]*model.ImageVariant{
 							"node": {
 								Name:                "node",
@@ -83,6 +84,16 @@ func TestDiscoverProject(t *testing.T) {
 							"poetry": "2.2.1",
 							"uv":     "0.8.22",
 						},
+						Secrets: model.Secrets{
+							"api_key": model.Secret{
+								SourceType: "env",
+								Value:      "API_KEY",
+							},
+							"token": model.Secret{
+								SourceType: "plain",
+								Value:      "secret_token_value",
+							},
+						},
 						Variants: map[string]*model.ImageVariant{},
 						Tags: map[string]*model.Tag{
 							"3.13.7": {
@@ -104,6 +115,7 @@ func TestDiscoverProject(t *testing.T) {
 							RootFSDir:           mustAbs(t, "../testdata/simple-project/images/dotnet/8/rootfs"),
 							DefinitionFilePath:  mustAbs(t, "../testdata/simple-project/images/dotnet/8/image.yml"),
 							BuildArgs:           model.BuildArgs{"foo": "bar"},
+							Secrets:             model.Secrets{},
 							Variants: map[string]*model.ImageVariant{
 								"node": {
 									Name:                "node",
@@ -150,6 +162,16 @@ func TestDiscoverProject(t *testing.T) {
 							Versions: model.Versions{
 								"poetry": "2.2.1",
 								"uv":     "0.8.22",
+							},
+							Secrets: model.Secrets{
+								"api_key": model.Secret{
+									SourceType: "env",
+									Value:      "API_KEY",
+								},
+								"token": model.Secret{
+									SourceType: "plain",
+									Value:      "secret_token_value",
+								},
 							},
 							Variants: map[string]*model.ImageVariant{},
 							Tags: map[string]*model.Tag{
