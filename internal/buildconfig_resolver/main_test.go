@@ -330,3 +330,120 @@ func TestForTagVariant(t *testing.T) {
 		})
 	}
 }
+
+func TestToBuildArgs(t *testing.T) {
+	tests := map[string]struct {
+		resolved *ResolvedBuildValues
+		expected model.BuildArgs
+	}{
+		"empty resolved values": {
+			resolved: &ResolvedBuildValues{
+				BuildArgs: model.BuildArgs{},
+				Versions:  model.Versions{},
+			},
+			expected: model.BuildArgs{},
+		},
+		"build args only": {
+			resolved: &ResolvedBuildValues{
+				BuildArgs: model.BuildArgs{
+					"BASE_IMAGE": "alpine:latest",
+					"WORKDIR":    "/app",
+				},
+				Versions: model.Versions{},
+			},
+			expected: model.BuildArgs{
+				"BASE_IMAGE": "alpine:latest",
+				"WORKDIR":    "/app",
+			},
+		},
+		"versions only": {
+			resolved: &ResolvedBuildValues{
+				BuildArgs: model.BuildArgs{},
+				Versions: model.Versions{
+					"python": "3.11",
+					"node":   "20.0.0",
+				},
+			},
+			expected: model.BuildArgs{
+				"PYTHON_VERSION": "3.11",
+				"NODE_VERSION":   "20.0.0",
+			},
+		},
+		"both build args and versions": {
+			resolved: &ResolvedBuildValues{
+				BuildArgs: model.BuildArgs{
+					"BASE_IMAGE": "alpine:latest",
+					"WORKDIR":    "/app",
+				},
+				Versions: model.Versions{
+					"python": "3.11",
+					"node":   "20.0.0",
+				},
+			},
+			expected: model.BuildArgs{
+				"BASE_IMAGE":     "alpine:latest",
+				"WORKDIR":        "/app",
+				"PYTHON_VERSION": "3.11",
+				"NODE_VERSION":   "20.0.0",
+			},
+		},
+		"hyphenated keys in versions": {
+			resolved: &ResolvedBuildValues{
+				BuildArgs: model.BuildArgs{},
+				Versions: model.Versions{
+					"some-package": "1.2.3",
+					"another-tool": "4.5.6",
+				},
+			},
+			expected: model.BuildArgs{
+				"SOME_PACKAGE_VERSION": "1.2.3",
+				"ANOTHER_TOOL_VERSION": "4.5.6",
+			},
+		},
+		"hyphenated keys in build args": {
+			resolved: &ResolvedBuildValues{
+				BuildArgs: model.BuildArgs{
+					"some-arg":    "value1",
+					"another-arg": "value2",
+				},
+				Versions: model.Versions{},
+			},
+			expected: model.BuildArgs{
+				"SOME_ARG":    "value1",
+				"ANOTHER_ARG": "value2",
+			},
+		},
+		"complex scenario": {
+			resolved: &ResolvedBuildValues{
+				BuildArgs: model.BuildArgs{
+					"base-image": "alpine:latest",
+					"work-dir":   "/app",
+					"BUILD_TYPE": "release",
+				},
+				Versions: model.Versions{
+					"python":  "3.11",
+					"node-js": "20.0.0",
+					"go-lang": "1.21",
+				},
+			},
+			expected: model.BuildArgs{
+				"BASE_IMAGE":      "alpine:latest",
+				"WORK_DIR":        "/app",
+				"BUILD_TYPE":      "release",
+				"PYTHON_VERSION":  "3.11",
+				"NODE_JS_VERSION": "20.0.0",
+				"GO_LANG_VERSION": "1.21",
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := tc.resolved.ToBuildArgs()
+
+			if diff := cmp.Diff(tc.expected, got); diff != "" {
+				t.Errorf("ToBuildArgs() mismatch (-expected +got):\n%s", diff)
+			}
+		})
+	}
+}
