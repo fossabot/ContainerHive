@@ -126,7 +126,3 @@ Without these libraries this project would not be possible:
 - CI hardcoding: Dump docker commands directly into GitHub Actions/GitLab CI, ensuring local devs can never reproduce
   builds.
 - Manual Dockerfiles: Edit tags by hand, ignore SBOMs, and pretend ubuntu:latest is a valid base image.
-
-
-## License
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Ftimo-reymann%2FContainerHive.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Ftimo-reymann%2FContainerHive?ref=badge_large)
